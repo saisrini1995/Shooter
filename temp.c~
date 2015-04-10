@@ -1,0 +1,40 @@
+ /*if(((xs1 -xb1 >10) && (xs1 - xb1 >54) && (ys1 - yb1 >10) && (ys1 - yb1 < 50)) || ((xs2 -xb2 >10) && (xs2 - xb2 >54) && (ys2 - yb2 >10) && (ys2 - yb2 < 50))){
+	      (en_bullets+i)->live=false;
+	      ship->health -=20;
+	      if(ship->health <=0) ship->live=false;
+	      break;
+	      }*/
+	    //basic bounded box collision works pretty well
+
+
+
+/*
+      //collision of enemy bullets and ship
+      for(i=0; i<en_n_bullets; i++){
+	//ship and enemy bullets must be alive
+	if(((en_bullets+i)->live) && ship->live){
+	  if((ship->x -(en_bullets+i)->x >25) && (ship->x - (en_bullets+i)->x >50) && (ship->y - (en_bullets+i)->y >25) && (ship->y - (en_bullets+i)->y < 50)){
+	    //collision happened
+	    printf("BOOM\n"); 
+	    (en_bullets+i)->live= false;
+	    ship->health -=20;
+	    if(ship->health <= 0)
+	      ship->live= false;
+	    break;
+	  }
+	}
+      }
+      
+      //Bounded box collision of ship and enemies
+      for(i=0; i<MAX_ENEMIES; i++){
+	if((enemies[i].live) && ship->live){
+	  //if enemy is live,
+	  //check if the enemy collides with the spaceship
+	  if(((enemies[i].x - ship->x) <=25) && ((enemies[i].x - ship->x) >= -25) && ((enemies[i].y -ship->y) <= 40) && ((enemies[i].y - ship->y) >= -40)){
+	    //collision condition
+	    //don't draw the ship
+	    ship->live =false;
+	    enemies[i].live= false;
+	  }
+	}
+	}*/

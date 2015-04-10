@@ -1,0 +1,141 @@
+
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_image.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define WIDTH 640
+#define HEIGHT 640
+//EN is the maximum enemy number
+#define EN 5
+//MAX_SHIPS is the maximum number of ships posible on the screen
+#define MAX_ENEMIES 6
+
+typedef struct Enemies_{
+  int x;
+  int y;
+  int speed;
+  bool live;
+}Enemy;
+
+const int FPS=30;
+
+//main function
+int main(int argc, char **argv){
+  int i,j;
+  int counter=0;
+  
+  srand(time(NULL));
+  
+  //initializing allegro
+  if(!al_init() || !al_init_primitives_addon() || !al_init_image_addon()){
+    printf("Error\n");
+    return 0;
+  }
+
+  //create display
+  ALLEGRO_DISPLAY* display=al_create_display(WIDTH, HEIGHT);
+  if(!display){
+    printf("Error\n");
+    return 0;
+  }
+
+  //event handling and timer
+  ALLEGRO_EVENT event;
+  ALLEGRO_EVENT_QUEUE* queue=al_create_event_queue();
+  if(!queue){
+    printf("Error\n");
+    return 0;
+  }
+  ALLEGRO_TIMER *timer=al_create_timer(1.0/FPS);
+  if(!timer){
+    printf("error\n");
+    return 0;
+  }
+
+  //registering event sources
+  if(!al_install_keyboard()){
+    printf("Error\n");
+    return 0;
+  }
+  al_register_event_source(queue, al_get_display_event_source(display));
+  al_register_event_source(queue, al_get_timer_event_source(timer));
+  al_register_event_source(queue, al_get_keyboard_event_source());
+
+  //cresating enemy array to store enemies and initializing enemies
+  Enemy enemies[MAX_ENEMIES];
+  for(i=0;i<MAX_ENEMIES;i++){
+    enemies[i].x=0;
+    enemies[i].y=0;
+    enemies[i].speed=5;
+    enemies[i].live=false;
+  }
+
+  //game loop
+  int ship=0;
+  bool done=false;
+  bool redraw=true;
+  al_start_timer(timer);
+
+  while(!done){
+    al_wait_for_event(queue, &event);
+
+    //if it is a timer event, update counter and enemy ships
+    if(event.type==ALLEGRO_EVENT_TIMER){
+      redraw=true;
+      counter++;
+      if(counter==15){
+	//after two seconds, we create new ships
+	counter=0;
+	for(i=0;i<rand()%EN;i++){
+	  if(!enemies[ship].live){
+	    enemies[ship].x=rand()%640;
+	    enemies[ship].y=0;
+	    enemies[ship].live=true;
+	    ship=(ship+1)%MAX_ENEMIES;
+	  }
+	}
+      }
+      //we update live ships positions and kill ships if position exceeds 640
+      for(i=0;i<MAX_ENEMIES;i++){
+	if(enemies[i].live){
+	  enemies[i].y +=enemies[i].speed;
+	}
+	if(enemies[i].y>=640){
+	  enemies[i].y=0;
+	  enemies[i].live=false;
+	}
+      }
+    }
+    else if(event.type==ALLEGRO_EVENT_DISPLAY_CLOSE){
+      done=false;
+    }
+    else if(event.type==ALLEGRO_EVENT_KEY_DOWN){
+      if(event.keyboard.keycode==ALLEGRO_KEY_ESCAPE){
+	done=true;
+      }
+    }
+
+    //draw ships
+    if(redraw && al_is_event_queue_empty(queue)){
+      //if event queue is empty
+      for(i=0;i<MAX_ENEMIES ;i++){
+	if(enemies[i].live){
+	  al_draw_filled_rectangle(enemies[i].x-10, enemies[i].y-10, enemies[i].x+10, enemies[i].y+10, al_map_rgb(255, 0, 255));
+	}
+      }
+      
+      al_flip_display();
+      al_clear_to_color(al_map_rgb(0, 0, 0));
+
+      redraw=false;
+    }
+  }    
+
+  al_destroy_event_queue(queue);
+  al_destroy_timer(timer);
+  al_destroy_display(display);
+
+}

@@ -1,0 +1,331 @@
+
+//Space Ship shooting bullets and moving random background
+
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_image.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+
+enum KEYS{UP, DOWN, LEFT, RIGHT};
+
+typedef struct SpaceShip_{
+  //all we need for now is just position and speed
+  int x;
+  int y;
+  int speed;
+}SpaceShip;
+
+typedef struct bullet_{
+  //all we need is position and state of the bullet
+  int x;
+  int y;
+  int speed;
+  bool live;
+}Bullet;
+
+typedef struct Background_{
+  ALLEGRO_BITMAP* bitmap;
+  //x and y are used to animate
+  int x;
+  int y;
+  int speed;
+}Background;
+
+const int FPS=30;
+const int BPS=5;
+const int n_bullets=10;
+//no of islands
+const int islands=5;
+bool keys[]={false, false, false, false};
+
+SpaceShip* init_ship();
+Bullet* init_bullets(const int);
+void draw_ship(SpaceShip *, ALLEGRO_BITMAP*);
+void draw_bullets(Bullet *);
+Background* init_background(char *);
+void destroy_background(Background *);
+void rand_bitmap(ALLEGRO_BITMAP* bitmap2, ALLEGRO_BITMAP* bitmap1 , ALLEGRO_BITMAP*, int **);
+//everything will be in another file
+
+int main(void){
+  //for loop variables
+  int i, j;
+
+  srand(time(NULL));
+
+  //initialize allegro and primitives
+  if(!al_init() || !al_init_primitives_addon() ||!al_init_image_addon()){
+    printf("Error\n");
+    return 0;
+  }
+
+  //create display
+  ALLEGRO_DISPLAY* display=al_create_display(640, 640);
+  if(!display){
+    printf("Error\n");
+    return 0;
+  }
+
+  //2d array containing map
+  int **map_array=(int**)malloc(5*sizeof(int*));
+  for(i=0;i<5;i++)
+    *(map_array+i)=(int*)malloc(5*sizeof(int));
+  
+  //initalizing the values
+  for(i=0;i<5;i++){
+    for(j=0;j<5;j++){
+      *(*(map_array+i)+j)=0;
+    }
+  }
+
+  //creating bitmaps
+  Background *background=init_background("Tileset.jpg");
+  if(!background->bitmap){
+    printf("Error\n");
+    return 0;
+  }
+  ALLEGRO_BITMAP* vehicle=al_load_bitmap("Vehicle.bmp");
+  if(!vehicle){
+    printf("Error\n");
+    return 0;
+  }
+  al_convert_mask_to_alpha(vehicle, al_get_pixel(vehicle, 0, 0));
+  ALLEGRO_BITMAP* temp1=NULL,*temp2=NULL;
+  temp1=al_create_bitmap(640, 640);
+  temp2=al_create_bitmap(640, 640);
+  //initializing bitmaps temp1 and temp2
+  rand_bitmap(temp2,temp1,background->bitmap, map_array);
+
+  //creating event queue
+  ALLEGRO_EVENT_QUEUE* queue=al_create_event_queue();
+  ALLEGRO_EVENT_QUEUE* timer_queue=al_create_event_queue();
+  ALLEGRO_EVENT event, timer_event;
+  if(!queue || !timer_queue){
+    printf("Error\n");
+    al_destroy_display(display);
+    return 0;
+  }
+
+  //initializing keyboard, timer and taking event sources
+  ALLEGRO_TIMER *timer=al_create_timer(1.0/FPS);
+  ALLEGRO_TIMER* bullet_timer=al_create_timer(1.0/BPS);
+  if(!al_install_keyboard()){
+    printf("Error\n");
+    al_destroy_display(display);
+    return 0;
+  }
+
+  al_register_event_source(queue, al_get_display_event_source(display));
+  al_register_event_source(queue, al_get_keyboard_event_source());
+  al_register_event_source(queue, al_get_timer_event_source(timer));
+  //timer_queue contains only timer events for bullet fire
+  al_register_event_source(timer_queue, al_get_timer_event_source(bullet_timer));
+
+  //creating spaceship and bullets
+  SpaceShip* ship=init_ship();
+  Bullet * bullets=init_bullets(n_bullets);
+  
+  //game loop
+  bool done=false;
+  bool redraw=true;
+ 
+  al_start_timer(timer);
+  al_start_timer(bullet_timer);
+
+  while(!done){
+
+    al_wait_for_event(queue, &event);
+    //creating new bullet
+    if(al_get_next_event(timer_queue, &timer_event)){
+      if(timer_event.type==ALLEGRO_EVENT_TIMER){
+	for(i=0;i<n_bullets;i++){
+	  //if bullet is dead, resusticate it
+	  if(!(bullets+i)->live){
+	    (bullets+i)->x=ship->x;
+	    (bullets+i)->y=ship->y-20;
+	    (bullets+i)->live=true;
+	    break;
+	  }
+	}
+      }
+    }
+
+    
+    if(event.type==ALLEGRO_EVENT_DISPLAY_CLOSE){
+      done=true;
+    }
+
+    else if(event.type==ALLEGRO_EVENT_KEY_DOWN){
+      switch(event.keyboard.keycode){
+      case ALLEGRO_KEY_UP:
+	keys[UP]=true;
+	break;
+      case ALLEGRO_KEY_DOWN:
+	keys[DOWN]=true;
+	break;
+      case ALLEGRO_KEY_LEFT:
+	keys[LEFT]=true;
+	break;
+      case ALLEGRO_KEY_RIGHT:
+	keys[RIGHT]=true;
+	break;
+      }
+    }
+
+    else if(event.type==ALLEGRO_EVENT_KEY_UP){
+      switch(event.keyboard.keycode){
+      case ALLEGRO_KEY_UP:
+	keys[UP]=false;
+	break;
+      case ALLEGRO_KEY_DOWN:
+	keys[DOWN]=false;
+	break;
+      case ALLEGRO_KEY_LEFT:
+	keys[LEFT]=false;
+	break;
+      case ALLEGRO_KEY_RIGHT:
+	keys[RIGHT]=false;
+	break;
+      case ALLEGRO_KEY_ESCAPE:
+	done=true;
+	break;
+      }
+    }
+
+    if(event.type==ALLEGRO_EVENT_TIMER){
+      redraw=true;
+      //update the ship and bullets
+      ship->y -=keys[UP]*(ship->speed);
+      ship->y +=keys[DOWN]*(ship->speed);
+      ship->x -=keys[LEFT]*(ship->speed);
+      ship->x +=keys[RIGHT]*(ship->speed);
+
+      for(i=0;i<n_bullets;i++){
+	if((bullets+i)->live){
+	  (bullets+i)->y -=(bullets+i)->speed;
+	  if((bullets+i)->y<0) (bullets+i)->live=false;
+	}
+      }
+      //updating the moving background
+      
+      background->y +=background->speed;
+      if(background->y >= 640*2){
+	background->y=0;
+	
+	//creating random bitmpas temp1 an temp2 using rand_bitmap function
+	//rand_bitmap(temp1, background->bitmap, map_array);
+	rand_bitmap(temp2, temp1, background->bitmap, map_array);
+      }
+    }
+    
+    if(redraw && al_is_event_queue_empty(queue)){
+      //drawing the bitmaps
+      //always set target bitmap to display backbuffer after using rand_bitmap()
+      al_set_target_bitmap(al_get_backbuffer(display));
+      al_draw_bitmap(temp1, 0, background->y, 0);
+      al_draw_bitmap(temp2, 0, -al_get_bitmap_height(temp2)+background->y, 0);
+      al_draw_bitmap(temp1, 0, 2*(-al_get_bitmap_height(temp2))+background->y, 0);
+
+      draw_ship(ship, vehicle);
+      draw_bullets(bullets);
+      al_flip_display();
+      al_clear_to_color(al_map_rgb(0, 0, 0));
+      
+      redraw=false;
+    }
+  }
+  al_destroy_timer(timer);
+  al_destroy_timer(bullet_timer);
+  al_destroy_event_queue(queue);
+  al_destroy_event_queue(timer_queue);
+  al_destroy_bitmap(temp1);
+  al_destroy_bitmap(temp2);
+  al_destroy_bitmap(vehicle);
+  //written function
+  destroy_background(background);
+
+  al_destroy_bitmap(vehicle);
+  al_destroy_display(display);
+}
+
+
+SpaceShip* init_ship(){
+  SpaceShip *ship=NULL;
+  ship=(SpaceShip*)malloc(sizeof(SpaceShip));
+  ship->x=32;
+  ship->y=640-32;
+  ship->speed=10;
+  return ship;
+}
+
+Bullet* init_bullets(const int n_bullets){
+  int i;
+  Bullet *bullets=NULL;
+  bullets=(Bullet*)malloc(n_bullets*sizeof(Bullet));
+  for(i=0;i<n_bullets;i++){
+    (bullets+i)->x=0;
+    (bullets+i)->y=0;
+    (bullets+i)->speed=15;
+    (bullets+i)->live=false;
+  }
+  return bullets;
+}
+
+void draw_ship(SpaceShip *ship, ALLEGRO_BITMAP* vehicle){
+  //al_draw_filled_rectangle(ship->x-10,ship->y-10, ship->x+10, ship->y+10, al_map_rgb(0, 255, 0));
+  al_draw_bitmap(vehicle, ship->x-32, ship->y-32, 0);
+}
+ 
+void draw_bullets(Bullet *bullets){
+  int i;
+  for(i=0;i<n_bullets;i++){
+    if((bullets+i)->live){
+      al_draw_filled_rectangle((bullets+i)->x-2, (bullets+i)->y-6, (bullets+i)->x+2, (bullets+i)->y+6, al_map_rgb(255, 0, 0));
+    }
+  }
+}
+
+Background* init_background(char *str){
+  Background* bgrnd=NULL;
+  bgrnd=(Background*)malloc(sizeof(Background));
+  bgrnd->x=0;
+  bgrnd->y=0;
+  bgrnd->bitmap=al_load_bitmap(str);
+  bgrnd->speed=3;
+  return bgrnd;
+}
+
+
+void destroy_background(Background *bgrnd){
+  al_destroy_bitmap(bgrnd->bitmap);
+}
+
+void rand_bitmap(ALLEGRO_BITMAP* bitmap2, ALLEGRO_BITMAP* bitmap1,  ALLEGRO_BITMAP* BG, int **map_array){
+  int i, j;
+  //initialize
+  for(i=0;i<5;i++){
+    for(j=0;j<5;j++){
+      *(*(map_array+i)+j)=0;
+    }
+  }
+  al_set_target_bitmap(bitmap1);      
+  for(i=0;i<5;i++){
+    for(j=0;j<5;j++){
+      al_draw_bitmap_region(BG, map_array[i][j]*128, 0, 128, 128, 128*i, 128*j, 0);
+    }
+  }
+  //randomise
+  for(i=0;i<islands;i++){
+    j=rand()%25;
+    map_array[j/5][j%5]=rand()%2;
+  }
+
+  al_set_target_bitmap(bitmap2);      
+  for(i=0;i<5;i++){
+    for(j=0;j<5;j++){
+      al_draw_bitmap_region(BG, map_array[i][j]*128, 0, 128, 128, 128*i, 128*j, 0);
+    }
+  }
+}
